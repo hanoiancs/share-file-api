@@ -10,7 +10,7 @@ from internal_static_files.app import create_app
 from internal_static_files.auth import create_access_token
 from internal_static_files.config import Settings, get_settings
 from internal_static_files.database import Base, get_db
-from internal_static_files.models import FileShare, ShareMode, StoredFile, User, normalize_email, split_email_domain
+from internal_static_files.models import FileShare, ShareMode, StoredFile, User, UserAuth, normalize_email, split_email_domain
 
 
 @pytest.fixture()
@@ -66,15 +66,22 @@ def client(app) -> Generator[TestClient]:
 
 @pytest.fixture()
 def user_factory(db_session: Session) -> Callable[..., User]:
-    def factory(email: str = "alice@example.com", google_sub: str | None = None) -> User:
+    def factory(email: str = "alice@example.com", oauth_id: str | None = None) -> User:
         normalized = normalize_email(email)
         user = User(
-            google_sub=google_sub or f"google-{normalized}",
             email=normalized,
             email_domain=split_email_domain(normalized),
             display_name=normalized.split("@", 1)[0],
         )
         db_session.add(user)
+        db_session.flush()
+        db_session.add(
+            UserAuth(
+                user_id=user.id,
+                oauth_provider="google",
+                oauth_id=oauth_id or f"google-{normalized}",
+            )
+        )
         db_session.commit()
         db_session.refresh(user)
         return user

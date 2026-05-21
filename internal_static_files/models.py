@@ -35,7 +35,6 @@ class User(SQLModel, table=True):
     __tablename__ = "users"
 
     id: int | None = Field(default=None, primary_key=True)
-    google_sub: str = Field(index=True, unique=True, max_length=255)
     email: str = Field(index=True, unique=True, max_length=320)
     email_domain: str = Field(index=True, max_length=255)
     display_name: str | None = Field(default=None, max_length=255)
@@ -57,6 +56,20 @@ class User(SQLModel, table=True):
         back_populates="owner",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
+    auths: list["UserAuth"] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
+    )
+
+
+class UserAuth(SQLModel, table=True):
+    __tablename__ = "user_auths"
+
+    user_id: int = Field(foreign_key="users.id", primary_key=True)
+    oauth_provider: str = Field(primary_key=True, max_length=64)
+    oauth_id: str = Field(index=True, max_length=255)
+
+    user: User = Relationship(back_populates="auths")
 
 
 class StoredFile(SQLModel, table=True):

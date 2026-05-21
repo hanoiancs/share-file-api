@@ -11,7 +11,7 @@ from sqlmodel import Session, select
 
 from internal_static_files.config import Settings, get_settings
 from internal_static_files.database import get_db
-from internal_static_files.models import User, normalize_email, split_email_domain, utc_now
+from internal_static_files.models import User, UserAuth, normalize_email, split_email_domain, utc_now
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/google/callback")
@@ -50,14 +50,25 @@ def get_current_user(
 
 def upsert_google_user(db: Session, identity: dict[str, Any]) -> User:
     email = normalize_email(str(identity["email"]))
-    google_sub = str(identity["sub"])
-    user = db.exec(select(User).where(User.google_sub == google_sub)).first()
-    if user is None:
+    oauth_id = str(identity["sub"])
+    auth = db.exec(
+        select(UserAuth)
+        .where(UserAuth.oauth_provider == "google")
+        .where(UserAuth.oauth_id == oauth_id)
+    ).first()
+    if auth is not None:
+        user = db.get(User, auth.user_id)
+        if user is None:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="orphaned user auth")
+    else:
         user = db.exec(select(User).where(User.email == email)).first()
     if user is None:
-        user = User(google_sub=google_sub, email=email, email_domain=split_email_domain(email))
+        user = User(email=email, email_domain=split_email_domain(email))
         db.add(user)
-    user.google_sub = google_sub
+        db.flush()
+    if auth is None:
+        auth = UserAuth(user_id=user.id, oauth_provider="google", oauth_id=oauth_id)
+        db.add(auth)
     user.email = email
     user.email_domain = split_email_domain(email)
     user.display_name = identity.get("name")
@@ -77,8 +88,8 @@ async def fetch_google_identity(_code: str) -> dict[str, Any]:
         scope="openid email profile",
     )
     try:
-        token = await client.fetch_token("https://oauth2.googleapis.com/token", code=_code)
-        response = await client.get("https://openidconnect.googleapis.com/v1/userinfo", token=token)
+        await client.fetch_token("https://oauth2.googleapis.com/token", code=_code)
+        response = await client.get("https://openidconnect.googleapis.com/v1/userinfo")
         response.raise_for_status()
         return response.json()
     except Exception as exc:

@@ -16,11 +16,14 @@ Read that spec before making architecture, API, data model, auth, storage, or sh
 - FastAPI
 - PostgreSQL
 - SQLModel
+- Alembic
 - Google OAuth
 - API-issued JWT bearer authentication
 - Local filesystem storage for uploaded HTML/Markdown bodies
 
 Use `uv` for dependency and environment workflows when possible, because the repo already contains `pyproject.toml` and `uv.lock`.
+
+Use Alembic for database schema changes. Alembic loads `DATABASE_URL` through the same `.env`-backed settings as the application.
 
 ## Product Rules
 
