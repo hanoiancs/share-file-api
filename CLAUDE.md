@@ -15,6 +15,7 @@ Read that spec before making architecture, API, data model, auth, storage, or sh
 - Python 3.13
 - FastAPI
 - PostgreSQL
+- SQLModel
 - Google OAuth
 - API-issued JWT bearer authentication
 - Local filesystem storage for uploaded HTML/Markdown bodies

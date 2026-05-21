@@ -2,45 +2,68 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import HTMLResponse, Response
-from sqlalchemy import or_, select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy import or_
+from sqlalchemy.orm import selectinload
+from sqlmodel import Session, select
 
 from internal_static_files.auth import get_current_user
 from internal_static_files.config import Settings, get_settings
 from internal_static_files.database import get_db
 from internal_static_files.markdown import render_markdown
-from internal_static_files.models import FileShare, ShareMode, StoredFile, User, normalize_email
-from internal_static_files.schemas import FileMetadataResponse, FileUpdateRequest, ShareListRequest, ShareListResponse
+from internal_static_files.models import (
+    FileShare,
+    ShareMode,
+    StoredFile,
+    User,
+    normalize_email,
+)
+from internal_static_files.schemas import (
+    FileMetadataResponse,
+    FileUpdateRequest,
+    ShareListRequest,
+    ShareListResponse,
+)
 from internal_static_files.sharing import can_read_file
-from internal_static_files.storage import LocalFileStorage, UnsupportedFileTypeError, UploadTooLargeError
-
+from internal_static_files.storage import (
+    LocalFileStorage,
+    UnsupportedFileTypeError,
+    UploadTooLargeError,
+)
 
 router = APIRouter(prefix="/files", tags=["files"])
 
 
-def get_storage(settings: Annotated[Settings, Depends(get_settings)]) -> LocalFileStorage:
+def get_storage(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> LocalFileStorage:
     return LocalFileStorage(settings.static_files_dir, settings.max_upload_bytes)
 
 
 def _get_file_or_404(db: Session, file_id: int) -> StoredFile:
-    stored_file = db.scalar(
+    stored_file = db.exec(
         select(StoredFile)
         .where(StoredFile.id == file_id)
         .options(selectinload(StoredFile.owner), selectinload(StoredFile.shares))
-    )
+    ).first()
     if stored_file is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="file not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="file not found"
+        )
     return stored_file
 
 
 def _require_read(user: User, stored_file: StoredFile) -> None:
     if not can_read_file(user, stored_file):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="access denied")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="access denied"
+        )
 
 
 def _require_owner(user: User, stored_file: StoredFile) -> None:
     if user.id != stored_file.owner_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="owner access required")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="owner access required"
+        )
 
 
 async def _read_upload(upload: UploadFile) -> bytes:
@@ -51,11 +74,17 @@ def _storage_error_to_http(exc: Exception) -> HTTPException:
     if isinstance(exc, UnsupportedFileTypeError):
         return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     if isinstance(exc, UploadTooLargeError):
-        return HTTPException(status_code=status.HTTP_413_CONTENT_TOO_LARGE, detail=str(exc))
-    return HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="storage failure")
+        return HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE, detail=str(exc)
+        )
+    return HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="storage failure"
+    )
 
 
-@router.post("", response_model=FileMetadataResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "", response_model=FileMetadataResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_file(
     title: Annotated[str, Form(min_length=1, max_length=255)],
     share_mode: Annotated[ShareMode, Form()],
@@ -91,7 +120,7 @@ def list_files(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> list[StoredFile]:
-    candidates = db.scalars(
+    candidates = db.exec(
         select(StoredFile)
         .join(User, StoredFile.owner_id == User.id)
         .outerjoin(FileShare, FileShare.file_id == StoredFile.id)
@@ -99,7 +128,8 @@ def list_files(
             or_(
                 StoredFile.owner_id == current_user.id,
                 StoredFile.share_mode == ShareMode.PUBLIC,
-                (StoredFile.share_mode == ShareMode.INTERNAL) & (User.email_domain == current_user.email_domain),
+                (StoredFile.share_mode == ShareMode.INTERNAL)
+                & (User.email_domain == current_user.email_domain),
                 (StoredFile.share_mode == ShareMode.SPECIFIC_PEOPLE)
                 & (FileShare.recipient_email == normalize_email(current_user.email)),
             )
@@ -169,7 +199,9 @@ async def replace_file_content(
     content = await _read_upload(upload)
     previous_path = stored_file.storage_path
     try:
-        stored_upload = storage.replace_upload(previous_path, upload.filename or stored_file.original_filename, content)
+        stored_upload = storage.replace_upload(
+            previous_path, upload.filename or stored_file.original_filename, content
+        )
     except Exception as exc:
         raise _storage_error_to_http(exc) from exc
     stored_file.original_filename = upload.filename or stored_file.original_filename
@@ -191,7 +223,9 @@ def replace_file_shares(
     stored_file = _get_file_or_404(db, file_id)
     _require_owner(current_user, stored_file)
     stored_file.shares.clear()
-    normalized_emails = sorted({normalize_email(str(email)) for email in payload.recipient_emails})
+    normalized_emails = sorted(
+        {normalize_email(str(email)) for email in payload.recipient_emails}
+    )
     for email in normalized_emails:
         stored_file.shares.append(FileShare(recipient_email=email))
     db.commit()

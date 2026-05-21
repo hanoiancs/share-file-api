@@ -7,8 +7,7 @@ from authlib.integrations.httpx_client import AsyncOAuth2Client
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlmodel import Session, select
 
 from internal_static_files.config import Settings, get_settings
 from internal_static_files.database import get_db
@@ -52,9 +51,9 @@ def get_current_user(
 def upsert_google_user(db: Session, identity: dict[str, Any]) -> User:
     email = normalize_email(str(identity["email"]))
     google_sub = str(identity["sub"])
-    user = db.scalar(select(User).where(User.google_sub == google_sub))
+    user = db.exec(select(User).where(User.google_sub == google_sub)).first()
     if user is None:
-        user = db.scalar(select(User).where(User.email == email))
+        user = db.exec(select(User).where(User.email == email)).first()
     if user is None:
         user = User(google_sub=google_sub, email=email, email_domain=split_email_domain(email))
         db.add(user)

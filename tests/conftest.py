@@ -3,9 +3,8 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
+from sqlmodel import Session, create_engine
 
 from internal_static_files.app import create_app
 from internal_static_files.auth import create_access_token
@@ -40,8 +39,7 @@ def db_session(settings: Settings) -> Generator[Session]:
         poolclass=StaticPool,
     )
     Base.metadata.create_all(engine)
-    SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
-    with SessionLocal() as session:
+    with Session(engine) as session:
         yield session
 
 

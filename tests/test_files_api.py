@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
+from sqlmodel import Session
 
 from internal_static_files.models import StoredFile
 

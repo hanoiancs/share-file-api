@@ -1,22 +1,20 @@
 from collections.abc import Generator
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from sqlmodel import SQLModel, Session, create_engine
 
 from internal_static_files.config import get_settings
 
 
-class Base(DeclarativeBase):
-    pass
+Base = SQLModel
+metadata = SQLModel.metadata
 
 
-def create_sessionmaker(database_url: str) -> sessionmaker[Session]:
+def create_db_engine(database_url: str):
     connect_args = {"check_same_thread": False} if database_url.startswith("sqlite") else {}
-    engine = create_engine(database_url, connect_args=connect_args)
-    return sessionmaker(bind=engine, autoflush=False, autocommit=False)
+    return create_engine(database_url, connect_args=connect_args)
 
 
 def get_db() -> Generator[Session]:
-    session_local = create_sessionmaker(get_settings().database_url)
-    with session_local() as session:
+    engine = create_db_engine(get_settings().database_url)
+    with Session(engine) as session:
         yield session

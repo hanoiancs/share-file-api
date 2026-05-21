@@ -12,6 +12,7 @@ dependencies = [
     "pydantic-settings>=2.14.1",
     "pyjwt>=2.10.1",
     "sqlalchemy>=2.0.44",
+    "sqlmodel>=0.0.38",
 ]
 
 [dependency-groups]
