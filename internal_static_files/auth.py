@@ -1,6 +1,6 @@
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
-from urllib.parse import urlencode
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import jwt
 from authlib.integrations.httpx_client import AsyncOAuth2Client
@@ -16,6 +16,7 @@ from internal_static_files.models import User, UserAuth, normalize_email, split_
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/google/callback")
 router = APIRouter()
+OAUTH_STATE_AUDIENCE = "google-oauth-state"
 
 
 def create_access_token(user: User, settings: Settings) -> str:
@@ -34,6 +35,39 @@ def decode_access_token(token: str, settings: Settings) -> int:
         return int(payload["sub"])
     except (jwt.PyJWTError, KeyError, ValueError) as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid token") from exc
+
+
+def encode_oauth_state(handle_url: str, settings: Settings) -> str:
+    payload = {
+        "handle_url": handle_url,
+        "aud": OAUTH_STATE_AUDIENCE,
+        "iat": int(datetime.now(UTC).timestamp()),
+    }
+    return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+
+
+def decode_oauth_state(state: str, settings: Settings | None = None) -> str:
+    settings = settings or get_settings()
+    try:
+        payload = jwt.decode(
+            state,
+            settings.jwt_secret_key,
+            algorithms=[settings.jwt_algorithm],
+            audience=OAUTH_STATE_AUDIENCE,
+        )
+        handle_url = payload["handle_url"]
+    except (jwt.PyJWTError, KeyError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid oauth state") from exc
+    if not isinstance(handle_url, str) or not handle_url:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid oauth state")
+    return handle_url
+
+
+def append_access_token(url: str, access_token: str) -> str:
+    parts = urlsplit(url)
+    query = parse_qsl(parts.query, keep_blank_values=True)
+    query.append(("access_token", access_token))
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
 
 
 def get_current_user(
@@ -97,7 +131,11 @@ async def fetch_google_identity(_code: str) -> dict[str, Any]:
 
 
 @router.get("/auth/google/login")
-def google_login(settings: Annotated[Settings, Depends(get_settings)]) -> RedirectResponse:
+def google_login(
+    settings: Annotated[Settings, Depends(get_settings)],
+    handle_url: Annotated[str | None, Query()] = None,
+) -> RedirectResponse:
+    redirect_url = handle_url or settings.client_default_redirect_url
     params = urlencode(
         {
             "client_id": settings.google_client_id,
@@ -106,6 +144,7 @@ def google_login(settings: Annotated[Settings, Depends(get_settings)]) -> Redire
             "scope": "openid email profile",
             "access_type": "offline",
             "prompt": "consent",
+            "state": encode_oauth_state(redirect_url, settings),
         }
     )
     return RedirectResponse(f"https://accounts.google.com/o/oauth2/v2/auth?{params}")
@@ -116,10 +155,13 @@ async def google_callback(
     code: Annotated[str, Query(min_length=1)],
     db: Annotated[Session, Depends(get_db)],
     settings: Annotated[Settings, Depends(get_settings)],
-) -> dict[str, str]:
+    state: Annotated[str | None, Query()] = None,
+) -> RedirectResponse:
     identity = await fetch_google_identity(code)
     user = upsert_google_user(db, identity)
-    return {"access_token": create_access_token(user, settings), "token_type": "bearer"}
+    access_token = create_access_token(user, settings)
+    handle_url = decode_oauth_state(state, settings) if state else settings.client_default_redirect_url
+    return RedirectResponse(append_access_token(handle_url, access_token))
 
 
 @router.get("/me")

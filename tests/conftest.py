@@ -26,6 +26,7 @@ def settings(storage_dir: Path) -> Settings:
         google_client_secret="test-client-secret",
         google_redirect_uri="http://testserver/auth/google/callback",
         jwt_secret_key="test-secret-key-with-at-least-32-bytes",
+        client_default_redirect_url="https://client.example.com/auth/complete",
         static_files_dir=storage_dir,
         max_upload_bytes=32,
     )

@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     google_client_id: str = "change-me"
     google_client_secret: str = "change-me"
     google_redirect_uri: str = "http://localhost:8000/auth/google/callback"
+    client_default_redirect_url: str = "http://localhost:3000/auth/complete"
     jwt_secret_key: str = "change-me"
     jwt_algorithm: str = "HS256"
     jwt_expires_minutes: int = 60

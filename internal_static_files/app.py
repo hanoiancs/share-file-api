@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from internal_static_files import models as _models
 from internal_static_files.auth import router as auth_router
@@ -10,6 +11,14 @@ _ = _models
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Internal Static Files API")
+    
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+        allow_credentials=False,
+    )
 
     @app.get("/health")
     def health() -> dict[str, str]:
