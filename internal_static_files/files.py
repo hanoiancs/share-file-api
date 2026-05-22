@@ -142,14 +142,6 @@ def list_files(
 ) -> PaginatedFilesResponse:
     offset = (page - 1) * per_page
 
-    # visibility_filter = or_(
-    #     StoredFile.owner_id == current_user.id,
-    #     StoredFile.share_mode == ShareMode.PUBLIC,
-    #     (StoredFile.share_mode == ShareMode.INTERNAL)
-    #     & (User.email_domain == current_user.email_domain),
-    #     (StoredFile.share_mode == ShareMode.SPECIFIC_PEOPLE)
-    #     & (FileShare.recipient_email == normalize_email(current_user.email)),
-    # )
     visibility_filter = (StoredFile.owner_id == current_user.id)
 
     total = db.exec(

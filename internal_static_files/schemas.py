@@ -5,6 +5,21 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from internal_static_files.models import ShareMode
 
 
+class FileOwnerResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    display_name: str | None
+
+
+class FileShareResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    file_id: int
+    recipient_email: str
+
+
 class FileMetadataResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -18,6 +33,8 @@ class FileMetadataResponse(BaseModel):
     size_bytes: int
     created_at: datetime
     updated_at: datetime
+    owner: FileOwnerResponse
+    shares: list[FileShareResponse]
 
 
 class PaginatedFilesResponse(BaseModel):

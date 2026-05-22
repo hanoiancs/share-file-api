@@ -4,7 +4,7 @@ from urllib.parse import parse_qs, urlparse
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
-from internal_static_files.models import ShareMode, StoredFile, User
+from internal_static_files.models import FileShare, ShareMode, StoredFile, User
 
 
 def test_get_file_content_redirects_missing_login_to_login_route(client: TestClient) -> None:
@@ -116,6 +116,37 @@ def test_list_files_supports_page_and_per_page(
     assert len(files) == 10
     assert files[0]["title"] == "File 10"
     assert files[-1]["title"] == "File 19"
+
+
+def test_list_files_includes_owner_and_shares(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    db_session: Session,
+) -> None:
+    created = client.post(
+        "/files",
+        headers=auth_headers,
+        data={"title": "Shared", "share_mode": "specific_people"},
+        files={"upload": ("shared.md", b"# Shared", "text/markdown")},
+    )
+    file_id = created.json()["id"]
+    share = FileShare(file_id=file_id, recipient_email="reader@example.com")
+    db_session.add(share)
+    db_session.commit()
+    db_session.refresh(share)
+
+    response = client.get("/files", headers=auth_headers)
+
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["owner"] == {"id": 1, "display_name": "alice"}
+    assert item["shares"] == [
+        {
+            "id": share.id,
+            "file_id": file_id,
+            "recipient_email": "reader@example.com",
+        }
+    ]
 
 
 def test_upload_rejects_unsupported_extension(client: TestClient, auth_headers: dict[str, str]) -> None:
