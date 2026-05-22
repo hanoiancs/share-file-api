@@ -24,6 +24,7 @@ def create_app() -> FastAPI:
         allow_credentials=False,
     )
 
+
     @app.get("/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}

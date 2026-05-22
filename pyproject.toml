@@ -8,6 +8,7 @@ dependencies = [
     "alembic>=1.17.2",
     "authlib>=1.6.5",
     "fastapi[standard]>=0.136.1",
+    "linkify-it-py>=2.1.0",
     "markdown-it-py>=4.2.0",
     "psycopg[binary]>=3.3.2",
     "pydantic-settings>=2.14.1",

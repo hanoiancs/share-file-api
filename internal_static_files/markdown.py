@@ -1,7 +1,10 @@
 from markdown_it import MarkdownIt
 
 
-_renderer = MarkdownIt("commonmark", {"html": False})
+_renderer = MarkdownIt("gfm-like2", {
+    "breaks": True,
+    "html": True
+}).enable("table")
 
 
 def render_markdown(markdown_text: str) -> str:

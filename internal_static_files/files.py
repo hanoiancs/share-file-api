@@ -15,6 +15,8 @@ from fastapi import (
     status,
 )
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi.templating import Jinja2Templates
+
 from sqlalchemy import delete, func, or_
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
@@ -49,6 +51,10 @@ from internal_static_files.storage import (
 )
 
 router = APIRouter(prefix="/files", tags=["files"])
+
+templates = Jinja2Templates(directory="templates")
+templates.env.autoescape = False
+templates.env.filters['markdown'] = render_markdown
 
 
 def get_storage(
@@ -144,7 +150,7 @@ def list_files(
 ) -> PaginatedFilesResponse:
     offset = (page - 1) * per_page
 
-    visibility_filter = (StoredFile.owner_id == current_user.id)
+    visibility_filter = StoredFile.owner_id == current_user.id
 
     total = db.exec(
         select(func.count(func.distinct(StoredFile.id)))
@@ -211,8 +217,16 @@ def get_file_content(
     stored_file = _get_file_or_404(db, file_id)
     _require_read(current_user, stored_file)
     content = storage.read(stored_file.storage_path)
+
     if stored_file.content_type == "markdown":
-        return HTMLResponse(render_markdown(content.decode("utf-8")))
+        # return HTMLResponse(render_markdown(content.decode("utf-8")))
+        return templates.TemplateResponse(
+            request=request,
+            name="markdown.html",
+            context={"content": content.decode("utf-8")},
+            # context={"content": render_markdown(content.decode("utf-8"))},
+        )
+
     return HTMLResponse(content.decode("utf-8"))
 
 
