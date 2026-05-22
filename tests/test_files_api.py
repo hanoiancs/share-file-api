@@ -2,9 +2,9 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from fastapi.testclient import TestClient
-from sqlmodel import Session
+from sqlmodel import Session, select
 
-from internal_static_files.models import StoredFile
+from internal_static_files.models import ShareMode, StoredFile, User
 
 
 def test_get_file_content_redirects_missing_login_to_login_route(client: TestClient) -> None:
@@ -48,6 +48,74 @@ def test_upload_markdown_and_read_rendered_content(client: TestClient, auth_head
     content = client.get(f"/files/{response.json()['id']}/content", headers=auth_headers)
     assert content.status_code == 200
     assert content.text.strip() == "<h1>Notes</h1>"
+
+
+def test_list_files_defaults_to_25_records_per_page(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    db_session: Session,
+) -> None:
+    owner = db_session.exec(select(User).where(User.email == "alice@example.com")).one()
+    for index in range(30):
+        db_session.add(
+            StoredFile(
+                owner_id=owner.id,
+                title=f"File {index:02}",
+                original_filename=f"file-{index:02}.md",
+                storage_path=f"generated/file-{index:02}.md",
+                content_type="markdown",
+                share_mode=ShareMode.SPECIFIC_PEOPLE,
+                size_bytes=8,
+            )
+        )
+    db_session.commit()
+
+    response = client.get("/files", headers=auth_headers)
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["page"] == 1
+    assert payload["per_page"] == 25
+    assert payload["total"] == 30
+    assert payload["total_pages"] == 2
+    files = payload["items"]
+    assert len(files) == 25
+    assert files[0]["title"] == "File 00"
+    assert files[-1]["title"] == "File 24"
+
+
+def test_list_files_supports_page_and_per_page(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    db_session: Session,
+) -> None:
+    owner = db_session.exec(select(User).where(User.email == "alice@example.com")).one()
+    for index in range(30):
+        db_session.add(
+            StoredFile(
+                owner_id=owner.id,
+                title=f"File {index:02}",
+                original_filename=f"file-{index:02}.md",
+                storage_path=f"generated/file-{index:02}.md",
+                content_type="markdown",
+                share_mode=ShareMode.SPECIFIC_PEOPLE,
+                size_bytes=8,
+            )
+        )
+    db_session.commit()
+
+    response = client.get("/files?page=2&per_page=10", headers=auth_headers)
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["page"] == 2
+    assert payload["per_page"] == 10
+    assert payload["total"] == 30
+    assert payload["total_pages"] == 3
+    files = payload["items"]
+    assert len(files) == 10
+    assert files[0]["title"] == "File 10"
+    assert files[-1]["title"] == "File 19"
 
 
 def test_upload_rejects_unsupported_extension(client: TestClient, auth_headers: dict[str, str]) -> None:

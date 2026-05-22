@@ -20,6 +20,14 @@ class FileMetadataResponse(BaseModel):
     updated_at: datetime
 
 
+class PaginatedFilesResponse(BaseModel):
+    items: list[FileMetadataResponse]
+    page: int
+    per_page: int
+    total: int
+    total_pages: int
+
+
 class FileUpdateRequest(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = None

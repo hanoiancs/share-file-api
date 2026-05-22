@@ -1,3 +1,4 @@
+from math import ceil
 from typing import Annotated
 from urllib.parse import urlencode
 
@@ -8,16 +9,21 @@ from fastapi import (
     File,
     Form,
     HTTPException,
+    Query,
     Request,
     UploadFile,
     status,
 )
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 
-from internal_static_files.auth import decode_access_token, get_current_user, oauth2_scheme
+from internal_static_files.auth import (
+    decode_access_token,
+    get_current_user,
+    oauth2_scheme,
+)
 from internal_static_files.config import Settings, get_settings
 from internal_static_files.database import get_db
 from internal_static_files.markdown import render_markdown
@@ -31,6 +37,7 @@ from internal_static_files.models import (
 from internal_static_files.schemas import (
     FileMetadataResponse,
     FileUpdateRequest,
+    PaginatedFilesResponse,
     ShareListRequest,
     ShareListResponse,
 )
@@ -126,29 +133,50 @@ async def create_file(
     return stored_file
 
 
-@router.get("", response_model=list[FileMetadataResponse])
+@router.get("", response_model=PaginatedFilesResponse)
 def list_files(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
-) -> list[StoredFile]:
+    page: Annotated[int, Query(ge=1)] = 1,
+    per_page: Annotated[int, Query(ge=1)] = 25,
+) -> PaginatedFilesResponse:
+    offset = (page - 1) * per_page
+
+    visibility_filter = or_(
+        StoredFile.owner_id == current_user.id,
+        StoredFile.share_mode == ShareMode.PUBLIC,
+        (StoredFile.share_mode == ShareMode.INTERNAL)
+        & (User.email_domain == current_user.email_domain),
+        (StoredFile.share_mode == ShareMode.SPECIFIC_PEOPLE)
+        & (FileShare.recipient_email == normalize_email(current_user.email)),
+    )
+
+    total = db.exec(
+        select(func.count(func.distinct(StoredFile.id)))
+        .join(User, StoredFile.owner_id == User.id)
+        .outerjoin(FileShare, FileShare.file_id == StoredFile.id)
+        .where(visibility_filter)
+    ).one()
+
     candidates = db.exec(
         select(StoredFile)
         .join(User, StoredFile.owner_id == User.id)
         .outerjoin(FileShare, FileShare.file_id == StoredFile.id)
-        .where(
-            or_(
-                StoredFile.owner_id == current_user.id,
-                StoredFile.share_mode == ShareMode.PUBLIC,
-                (StoredFile.share_mode == ShareMode.INTERNAL)
-                & (User.email_domain == current_user.email_domain),
-                (StoredFile.share_mode == ShareMode.SPECIFIC_PEOPLE)
-                & (FileShare.recipient_email == normalize_email(current_user.email)),
-            )
-        )
+        .where(visibility_filter)
         .options(selectinload(StoredFile.owner), selectinload(StoredFile.shares))
         .distinct()
+        .order_by(StoredFile.id)
+        .offset(offset)
+        .limit(per_page)
     ).all()
-    return list(candidates)
+    
+    return PaginatedFilesResponse(
+        items=list(candidates),
+        page=page,
+        per_page=per_page,
+        total=total,
+        total_pages=ceil(total / per_page) if total else 0,
+    )
 
 
 @router.get("/{file_id}", response_model=FileMetadataResponse)
