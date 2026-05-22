@@ -1,10 +1,10 @@
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.parse import urlencode
 
 import jwt
 from authlib.integrations.httpx_client import AsyncOAuth2Client
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordBearer
 from sqlmodel import Session, select
@@ -14,7 +14,7 @@ from internal_static_files.database import get_db
 from internal_static_files.models import User, UserAuth, normalize_email, split_email_domain, utc_now
 
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/google/callback")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/google/callback", auto_error=False)
 router = APIRouter()
 OAUTH_STATE_AUDIENCE = "google-oauth-state"
 
@@ -63,18 +63,28 @@ def decode_oauth_state(state: str, settings: Settings | None = None) -> str:
     return handle_url
 
 
-def append_access_token(url: str, access_token: str) -> str:
-    parts = urlsplit(url)
-    query = parse_qsl(parts.query, keep_blank_values=True)
-    query.append(("access_token", access_token))
-    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
+def redirect_with_access_token_cookie(url: str, access_token: str, settings: Settings) -> RedirectResponse:
+    response = RedirectResponse(url)
+    response.set_cookie(
+        "access_token",
+        access_token,
+        httponly=True,
+        secure=False,
+        samesite="lax",
+        max_age=settings.jwt_expires_minutes * 60,
+    )
+    return response
 
 
 def get_current_user(
-    token: Annotated[str, Depends(oauth2_scheme)],
     db: Annotated[Session, Depends(get_db)],
     settings: Annotated[Settings, Depends(get_settings)],
+    bearer_token: Annotated[str | None, Depends(oauth2_scheme)] = None,
+    access_token: Annotated[str | None, Cookie()] = None,
 ) -> User:
+    token = bearer_token or access_token
+    if token is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="missing token")
     user_id = decode_access_token(token, settings)
     user = db.get(User, user_id)
     if user is None:
@@ -130,7 +140,7 @@ async def fetch_google_identity(_code: str) -> dict[str, Any]:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Google identity fetch failed") from exc
 
 
-@router.get("/auth/google/login")
+@router.get("/auth/google/login", name="auth_google_login")
 def google_login(
     settings: Annotated[Settings, Depends(get_settings)],
     handle_url: Annotated[str | None, Query()] = None,
@@ -161,7 +171,7 @@ async def google_callback(
     user = upsert_google_user(db, identity)
     access_token = create_access_token(user, settings)
     handle_url = decode_oauth_state(state, settings) if state else settings.client_default_redirect_url
-    return RedirectResponse(append_access_token(handle_url, access_token))
+    return redirect_with_access_token_cookie(handle_url, access_token, settings)
 
 
 @router.get("/me")

@@ -6,6 +6,16 @@ from sqlmodel import Session
 from internal_static_files.models import StoredFile
 
 
+def test_get_file_content_redirects_missing_login_to_login_route(client: TestClient) -> None:
+    response = client.get("/files/123/content", follow_redirects=False)
+
+    assert response.status_code in {302, 307}
+    assert (
+        response.headers["location"]
+        == "/auth/google/login?handle_url=http%3A%2F%2Ftestserver%2Ffiles%2F123%2Fcontent"
+    )
+
+
 def test_upload_html_and_read_raw_content(client: TestClient, auth_headers: dict[str, str]) -> None:
     response = client.post(
         "/files",

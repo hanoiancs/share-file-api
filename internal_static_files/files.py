@@ -1,12 +1,23 @@
 from typing import Annotated
+from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from fastapi.responses import HTMLResponse, Response
+from fastapi import (
+    APIRouter,
+    Cookie,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    UploadFile,
+    status,
+)
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlalchemy import or_
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 
-from internal_static_files.auth import get_current_user
+from internal_static_files.auth import decode_access_token, get_current_user, oauth2_scheme
 from internal_static_files.config import Settings, get_settings
 from internal_static_files.database import get_db
 from internal_static_files.markdown import render_markdown
@@ -154,10 +165,24 @@ def get_file(
 @router.get("/{file_id}/content")
 def get_file_content(
     file_id: int,
+    request: Request,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    settings: Annotated[Settings, Depends(get_settings)],
     storage: Annotated[LocalFileStorage, Depends(get_storage)],
+    bearer_token: Annotated[str | None, Depends(oauth2_scheme)] = None,
+    access_token: Annotated[str | None, Cookie()] = None,
 ) -> Response:
+    token = bearer_token or access_token
+    if token is None:
+        return RedirectResponse(
+            request.url_for("auth_google_login").include_query_params(handle_url=str(request.url))
+        )
+    user_id = decode_access_token(token, settings)
+    current_user = db.get(User, user_id)
+    if current_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="user not found"
+        )
     stored_file = _get_file_or_404(db, file_id)
     _require_read(current_user, stored_file)
     content = storage.read(stored_file.storage_path)

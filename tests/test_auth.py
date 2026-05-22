@@ -40,7 +40,7 @@ def test_google_login_stores_handle_url_in_oauth_state(client: TestClient, setti
     assert decode_oauth_state(state, settings) == "https://client.example.com/done"
 
 
-def test_google_callback_redirects_to_state_handle_url_with_access_token(
+def test_google_callback_redirects_to_state_handle_url_and_sets_access_token_cookie(
     client: TestClient, db_session: Session, monkeypatch
 ) -> None:
     async def fake_identity(_code: str) -> dict[str, str]:
@@ -65,9 +65,11 @@ def test_google_callback_redirects_to_state_handle_url_with_access_token(
     query = parse_qs(redirect.query)
     assert f"{redirect.scheme}://{redirect.netloc}{redirect.path}" == "https://client.example.com/done"
     assert query["source"] == ["login"]
-    assert query["access_token"][0]
+    assert "access_token" not in query
+    access_token = response.cookies["access_token"]
 
-    me = client.get("/me", headers={"Authorization": f"Bearer {query['access_token'][0]}"})
+    client.cookies.set("access_token", access_token)
+    me = client.get("/me")
     assert me.status_code == 200
     assert me.json()["email"] == "bob@example.com"
 
@@ -96,7 +98,16 @@ def test_google_callback_uses_default_redirect_url_without_state(
     redirect = urlparse(response.headers["location"])
     query = parse_qs(redirect.query)
     assert f"{redirect.scheme}://{redirect.netloc}{redirect.path}" == "https://client.example.com/auth/complete"
-    assert query["access_token"][0]
+    assert "access_token" not in query
+    assert response.cookies["access_token"]
+
+
+def test_me_accepts_access_token_cookie(client: TestClient, user_token: str) -> None:
+    client.cookies.set("access_token", user_token)
+    response = client.get("/me")
+
+    assert response.status_code == 200
+    assert response.json()["email"] == "alice@example.com"
 
 
 def test_google_callback_matches_existing_user_by_user_auth(

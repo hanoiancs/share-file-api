@@ -10,8 +10,8 @@ _ = _models
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="Internal Static Files API")
-    
+    app = FastAPI(title="Internal Static Files API", root_path="/api")
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
