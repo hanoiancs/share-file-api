@@ -162,7 +162,7 @@ def get_file(
     return stored_file
 
 
-@router.get("/{file_id}/content")
+@router.get("/{file_id}/content", name="get_file_content")
 def get_file_content(
     file_id: int,
     request: Request,
@@ -175,7 +175,9 @@ def get_file_content(
     token = bearer_token or access_token
     if token is None:
         return RedirectResponse(
-            request.url_for("auth_google_login").include_query_params(handle_url=str(request.url))
+            request.url_for("auth_google_login").include_query_params(
+                handle_url=request.url_for("get_file_content", file_id=file_id)
+            )
         )
     user_id = decode_access_token(token, settings)
     current_user = db.get(User, user_id)

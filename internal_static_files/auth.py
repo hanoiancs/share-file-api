@@ -1,11 +1,11 @@
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
-from urllib.parse import urlencode
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import jwt
 from authlib.integrations.httpx_client import AsyncOAuth2Client
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, status
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 from fastapi.security import OAuth2PasswordBearer
 from sqlmodel import Session, select
 
@@ -63,8 +63,7 @@ def decode_oauth_state(state: str, settings: Settings | None = None) -> str:
     return handle_url
 
 
-def redirect_with_access_token_cookie(url: str, access_token: str, settings: Settings) -> RedirectResponse:
-    response = RedirectResponse(url)
+def set_access_token_cookie(response: Response, access_token: str, settings: Settings) -> None:
     response.set_cookie(
         "access_token",
         access_token,
@@ -73,7 +72,19 @@ def redirect_with_access_token_cookie(url: str, access_token: str, settings: Set
         samesite="lax",
         max_age=settings.jwt_expires_minutes * 60,
     )
+
+
+def redirect_with_access_token_cookie(url: str, access_token: str, settings: Settings) -> RedirectResponse:
+    response = RedirectResponse(url)
+    set_access_token_cookie(response, access_token, settings)
     return response
+
+
+def append_access_token(url: str, access_token: str) -> str:
+    parts = urlsplit(url)
+    query = parse_qsl(parts.query, keep_blank_values=True)
+    query.append(("access_token", access_token))
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
 
 
 def get_current_user(
@@ -171,7 +182,7 @@ async def google_callback(
     user = upsert_google_user(db, identity)
     access_token = create_access_token(user, settings)
     handle_url = decode_oauth_state(state, settings) if state else settings.client_default_redirect_url
-    return redirect_with_access_token_cookie(handle_url, access_token, settings)
+    return redirect_with_access_token_cookie(append_access_token(handle_url, access_token), access_token, settings)
 
 
 @router.get("/me")

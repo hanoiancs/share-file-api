@@ -65,8 +65,9 @@ def test_google_callback_redirects_to_state_handle_url_and_sets_access_token_coo
     query = parse_qs(redirect.query)
     assert f"{redirect.scheme}://{redirect.netloc}{redirect.path}" == "https://client.example.com/done"
     assert query["source"] == ["login"]
-    assert "access_token" not in query
+    assert query["access_token"][0]
     access_token = response.cookies["access_token"]
+    assert query["access_token"] == [access_token]
 
     client.cookies.set("access_token", access_token)
     me = client.get("/me")
@@ -98,8 +99,8 @@ def test_google_callback_uses_default_redirect_url_without_state(
     redirect = urlparse(response.headers["location"])
     query = parse_qs(redirect.query)
     assert f"{redirect.scheme}://{redirect.netloc}{redirect.path}" == "https://client.example.com/auth/complete"
-    assert "access_token" not in query
-    assert response.cookies["access_token"]
+    access_token = response.cookies["access_token"]
+    assert query["access_token"] == [access_token]
 
 
 def test_me_accepts_access_token_cookie(client: TestClient, user_token: str) -> None:
@@ -108,6 +109,24 @@ def test_me_accepts_access_token_cookie(client: TestClient, user_token: str) -> 
 
     assert response.status_code == 200
     assert response.json()["email"] == "alice@example.com"
+
+
+def test_access_token_query_is_saved_to_cookie_globally(
+    client: TestClient, user_token: str
+) -> None:
+    response = client.get(
+        f"/health?source=login&access_token={user_token}",
+        follow_redirects=False,
+    )
+
+    assert response.status_code in {302, 307}
+    redirect = urlparse(response.headers["location"])
+    assert redirect.path == "/api/health"
+    assert parse_qs(redirect.query) == {"source": ["login"]}
+    assert response.cookies["access_token"] == user_token
+    me = client.get("/me")
+    assert me.status_code == 200
+    assert me.json()["email"] == "alice@example.com"
 
 
 def test_google_callback_matches_existing_user_by_user_auth(

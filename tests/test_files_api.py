@@ -1,4 +1,5 @@
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 from fastapi.testclient import TestClient
 from sqlmodel import Session
@@ -10,10 +11,11 @@ def test_get_file_content_redirects_missing_login_to_login_route(client: TestCli
     response = client.get("/files/123/content", follow_redirects=False)
 
     assert response.status_code in {302, 307}
-    assert (
-        response.headers["location"]
-        == "/auth/google/login?handle_url=http%3A%2F%2Ftestserver%2Ffiles%2F123%2Fcontent"
-    )
+    redirect = urlparse(response.headers["location"])
+    assert redirect.path == "/api/auth/google/login"
+    assert parse_qs(redirect.query)["handle_url"] == [
+        "http://testserver/api/files/123/content"
+    ]
 
 
 def test_upload_html_and_read_raw_content(client: TestClient, auth_headers: dict[str, str]) -> None:
