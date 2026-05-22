@@ -27,17 +27,29 @@ class LocalFileStorage:
         self.root = Path(root)
         self.max_upload_bytes = max_upload_bytes
 
-    def write_upload(self, original_filename: str, content: bytes) -> StoredUpload:
+    def write_upload(
+        self, user_id: int, original_filename: str, content: bytes
+    ) -> StoredUpload:
         content_type, suffix = self._classify(original_filename)
         self._validate_size(content)
-        relative_path = f"{uuid4().hex}{suffix}"
+        relative_path = str(Path(str(user_id)) / f"{uuid4().hex}{suffix}")
         absolute_path = self.root / relative_path
         absolute_path.parent.mkdir(parents=True, exist_ok=True)
         absolute_path.write_bytes(content)
-        return StoredUpload(relative_path=relative_path, content_type=content_type, size_bytes=len(content))
+        return StoredUpload(
+            relative_path=relative_path,
+            content_type=content_type,
+            size_bytes=len(content),
+        )
 
-    def replace_upload(self, previous_relative_path: str, original_filename: str, content: bytes) -> StoredUpload:
-        new_upload = self.write_upload(original_filename, content)
+    def replace_upload(
+        self,
+        previous_relative_path: str,
+        user_id: int,
+        original_filename: str,
+        content: bytes,
+    ) -> StoredUpload:
+        new_upload = self.write_upload(user_id, original_filename, content)
         self.delete(previous_relative_path)
         return new_upload
 

@@ -114,7 +114,9 @@ async def create_file(
 ) -> StoredFile:
     content = await _read_upload(upload)
     try:
-        stored_upload = storage.write_upload(upload.filename or "upload", content)
+        stored_upload = storage.write_upload(
+            current_user.id, upload.filename or "upload", content
+        )
     except Exception as exc:
         raise _storage_error_to_http(exc) from exc
     stored_file = StoredFile(
@@ -248,7 +250,10 @@ async def replace_file_content(
     previous_path = stored_file.storage_path
     try:
         stored_upload = storage.replace_upload(
-            previous_path, upload.filename or stored_file.original_filename, content
+            previous_path,
+            current_user.id,
+            upload.filename or stored_file.original_filename,
+            content,
         )
     except Exception as exc:
         raise _storage_error_to_http(exc) from exc

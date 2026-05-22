@@ -260,6 +260,8 @@ def test_owner_replaces_content_and_delete_removes_file(
     )
     file_id = created.json()["id"]
     old_path = db_session.get(StoredFile, file_id).storage_path
+    assert Path(old_path).parent == Path("1")
+    assert (storage_dir / old_path).exists()
 
     replaced = client.put(
         f"/files/{file_id}/content",
@@ -270,7 +272,9 @@ def test_owner_replaces_content_and_delete_removes_file(
     assert replaced.status_code == 200
     replaced_file = db_session.get(StoredFile, file_id)
     assert replaced_file.storage_path != old_path
+    assert Path(replaced_file.storage_path).parent == Path("1")
     assert not (storage_dir / old_path).exists()
+    assert (storage_dir / replaced_file.storage_path).exists()
 
     deleted = client.delete(f"/files/{file_id}", headers=auth_headers)
     assert deleted.status_code == 204
