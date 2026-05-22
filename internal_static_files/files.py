@@ -15,7 +15,7 @@ from fastapi import (
     status,
 )
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
-from sqlalchemy import func, or_
+from sqlalchemy import delete, func, or_
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 
@@ -274,8 +274,10 @@ def replace_file_shares(
     normalized_emails = sorted(
         {normalize_email(str(email)) for email in payload.recipient_emails}
     )
+    db.exec(delete(FileShare).where(FileShare.file_id == file_id))
+    db.flush()
     for email in normalized_emails:
-        stored_file.shares.append(FileShare(recipient_email=email))
+        db.add(FileShare(file_id=file_id, recipient_email=email))
     db.commit()
     return ShareListResponse(recipient_emails=normalized_emails)
 

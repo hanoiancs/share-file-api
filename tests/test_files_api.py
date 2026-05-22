@@ -197,6 +197,37 @@ def test_specific_people_share_allows_matching_email(
     assert response.status_code == 200
 
 
+def test_owner_replaces_existing_file_shares_without_duplicate_key_error(
+    client: TestClient,
+    auth_headers: dict[str, str],
+) -> None:
+    created = client.post(
+        "/files",
+        headers=auth_headers,
+        data={"title": "Private", "share_mode": "specific_people"},
+        files={"upload": ("private.md", b"# Private", "text/markdown")},
+    )
+    file_id = created.json()["id"]
+    first = client.put(
+        f"/files/{file_id}/shares",
+        headers=auth_headers,
+        json={"recipient_emails": ["reader@example.com"]},
+    )
+
+    second = client.put(
+        f"/files/{file_id}/shares",
+        headers=auth_headers,
+        json={"recipient_emails": ["reader@example.com", "other@example.com"]},
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert second.json()["recipient_emails"] == [
+        "other@example.com",
+        "reader@example.com",
+    ]
+
+
 def test_internal_share_denies_different_domain(
     client: TestClient,
     auth_headers: dict[str, str],
