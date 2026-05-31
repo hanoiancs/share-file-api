@@ -28,4 +28,7 @@ RUN mv .env.prod .env
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen
 
+# RUN chmod +x /app/entrypoint.sh
+ENTRYPOINT ["./entrypoint.sh"]
+
 CMD ["uv", "run", "--env-file", ".env", "fastapi", "run", "main.py", "--port", "80"]
