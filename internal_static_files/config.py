@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     static_files_dir: Path = Path("statics")
     max_upload_bytes: int = 5 * 1024 * 1024
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=(".env.dev", ".env"), extra="ignore")
 
 
 @lru_cache

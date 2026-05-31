@@ -23,9 +23,9 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # 3. Copy the rest of the application source code
 # (Changes here will no longer trigger a full pip/uv reinstall)
 COPY . .
-
+RUN mv .env.prod .env
 # 4. Final sync to install the project itself (fast, since dependencies are cached)
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen
 
-CMD ["uv", "run", "--env-file", ".env.prod", "fastapi", "run", "main.py", "--port", "80"]
+CMD ["uv", "run", "--env-file", ".env", "fastapi", "run", "main.py", "--port", "80"]
