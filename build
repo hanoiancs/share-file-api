@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+IMAGE_NAME="${IMAGE_NAME:-share-api}"
+CONTAINER_NAME="${CONTAINER_NAME:-share-api}"
+HOST_PORT="${HOST_PORT:-8082}"
+CONTAINER_PORT="${CONTAINER_PORT:-80}"
+
+
+build_args=()
+
+echo "Building Docker image: ${IMAGE_NAME} - ${build_args[@]}"
+docker build "${build_args[@]}" -t "${IMAGE_NAME}" .
+
+running_container_id="$(docker ps -q -f "name=^/${CONTAINER_NAME}$")"
+if [[ -n "${running_container_id}" ]]; then
+  echo "Stopping running container: ${CONTAINER_NAME}"
+  docker stop "${CONTAINER_NAME}"
+fi
+
+existing_container_id="$(docker ps -aq -f "name=^/${CONTAINER_NAME}$")"
+if [[ -n "${existing_container_id}" ]]; then
+  echo "Removing existing container: ${CONTAINER_NAME}"
+  docker rm "${CONTAINER_NAME}"
+fi
+
+echo "Starting container: ${CONTAINER_NAME}"
+docker run -d \
+  --add-host=host.docker.internal:host-gateway \
+  --name "${CONTAINER_NAME}" \
+  --mount type=bind,source="$(pwd)/statics",target=/app/statics \
+  -p "${HOST_PORT}:${CONTAINER_PORT}" \
+  "${IMAGE_NAME}"
+
+echo "Container is running at http://localhost:${HOST_PORT}"

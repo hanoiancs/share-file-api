@@ -1,0 +1,11 @@
+# .dockerignore
+node_modules
+.env.dev
+docs
+tests
+.venv
+.vscode
+.codex
+.git
+build
+statics
