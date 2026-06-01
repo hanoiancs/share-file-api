@@ -1,6 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,8 +16,9 @@ class Settings(BaseSettings):
     jwt_expires_minutes: int = 60
     static_files_dir: Path = Path("statics")
     max_upload_bytes: int = 5 * 1024 * 1024
+    allowed_users: list[str] = []
 
-    model_config = SettingsConfigDict(env_file=(".env.dev", ".env"), extra="ignore")
+    model_config = SettingsConfigDict(env_file=".env.dev", extra="allow")
 
 
 @lru_cache

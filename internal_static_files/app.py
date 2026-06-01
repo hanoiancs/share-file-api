@@ -1,12 +1,14 @@
+from typing import Any
+from typing import Annotated
 from urllib.parse import urlencode, urlsplit, urlunsplit
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 
 from internal_static_files import models as _models
 from internal_static_files.auth import router as auth_router, set_access_token_cookie
-from internal_static_files.config import get_settings
+from internal_static_files.config import Settings, get_settings
 from internal_static_files.database import Base
 from internal_static_files.files import router as files_router
 
@@ -24,10 +26,9 @@ def create_app() -> FastAPI:
         allow_credentials=False,
     )
 
-
     @app.get("/health")
     def health() -> dict[str, str]:
-        return {"status": "ok"}
+        return {"status": "OK"}
 
     @app.middleware("http")
     async def persist_access_token_query_param(request, call_next):

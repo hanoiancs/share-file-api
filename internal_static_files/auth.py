@@ -179,6 +179,13 @@ async def google_callback(
     state: Annotated[str | None, Query()] = None,
 ) -> RedirectResponse:
     identity = await fetch_google_identity(code)
+
+    if len(settings.allowed_users) > 0 and "email" in identity:
+        email = identity["email"]
+        if email not in settings.allowed_users:
+            # raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Email is not allowed.")
+            return {"error": "Email is not allowed."}
+
     user = upsert_google_user(db, identity)
     access_token = create_access_token(user, settings)
     handle_url = decode_oauth_state(state, settings) if state else settings.client_default_redirect_url
