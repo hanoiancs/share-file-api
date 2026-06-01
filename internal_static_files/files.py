@@ -50,11 +50,33 @@ from internal_static_files.storage import (
     UploadTooLargeError,
 )
 
-router = APIRouter(prefix="/files", tags=["files"])
+
+def require_allowed_user(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    bearer_token: Annotated[str | None, Depends(oauth2_scheme)] = None,
+    access_token: Annotated[str | None, Cookie()] = None,
+):
+    if request.scope["route"].name != "get_file_content":
+        user: User = get_current_user(db, settings, bearer_token, access_token)
+
+        if len(settings.allowed_users) > 0:
+            email = user.email
+            if email not in settings.allowed_users:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="not allowed user",
+                )
+
+
+router = APIRouter(
+    prefix="/files", tags=["files"], dependencies=[Depends(require_allowed_user)]
+)
 
 templates = Jinja2Templates(directory="templates")
 templates.env.autoescape = False
-templates.env.filters['markdown'] = render_markdown
+templates.env.filters["markdown"] = render_markdown
 
 
 def get_storage(
