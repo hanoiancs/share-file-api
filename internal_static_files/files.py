@@ -51,27 +51,9 @@ from internal_static_files.storage import (
 )
 
 
-def require_allowed_user(
-    request: Request,
-    db: Annotated[Session, Depends(get_db)],
-    settings: Annotated[Settings, Depends(get_settings)],
-    bearer_token: Annotated[str | None, Depends(oauth2_scheme)] = None,
-    access_token: Annotated[str | None, Cookie()] = None,
-):
-    if request.scope["route"].name != "get_file_content":
-        user: User = get_current_user(db, settings, bearer_token, access_token)
-
-        if len(settings.allowed_users) > 0:
-            email = user.email
-            if email not in settings.allowed_users:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="not allowed user",
-                )
-
 
 router = APIRouter(
-    prefix="/files", tags=["files"], dependencies=[Depends(require_allowed_user)]
+    prefix="/files", tags=["files"] 
 )
 
 templates = Jinja2Templates(directory="templates")
@@ -127,6 +109,18 @@ def _storage_error_to_http(exc: Exception) -> HTTPException:
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="storage failure"
     )
 
+def _require_allowed_user(
+    user: User,
+    settings: Settings
+):
+    if len(settings.allowed_users) > 0:
+        email = user.email
+        if email not in settings.allowed_users:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="not allowed user",
+            )
+
 
 @router.post(
     "", response_model=FileMetadataResponse, status_code=status.HTTP_201_CREATED
@@ -137,9 +131,12 @@ async def create_file(
     upload: Annotated[UploadFile, File()],
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    settings: Annotated[Settings, Depends(get_settings)],
     storage: Annotated[LocalFileStorage, Depends(get_storage)],
     description: Annotated[str | None, Form()] = None,
 ) -> StoredFile:
+    _require_allowed_user(current_user, settings)
+    
     content = await _read_upload(upload)
     try:
         stored_upload = storage.write_upload(
@@ -167,9 +164,12 @@ async def create_file(
 def list_files(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    settings: Annotated[Settings, Depends(get_settings)],
     page: Annotated[int, Query(ge=1)] = 1,
     per_page: Annotated[int, Query(ge=1)] = 25,
 ) -> PaginatedFilesResponse:
+    _require_allowed_user(current_user, settings)
+
     offset = (page - 1) * per_page
 
     visibility_filter = StoredFile.owner_id == current_user.id
@@ -258,7 +258,10 @@ def update_file(
     payload: FileUpdateRequest,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    settings: Annotated[Settings, Depends(get_settings)]
 ) -> StoredFile:
+    _require_allowed_user(current_user, settings)
+
     stored_file = _get_file_or_404(db, file_id)
     _require_owner(current_user, stored_file)
     if payload.title is not None:
@@ -308,7 +311,10 @@ def replace_file_shares(
     payload: ShareListRequest,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    settings: Annotated[Settings, Depends(get_settings)]
 ) -> ShareListResponse:
+    _require_allowed_user(current_user, settings)
+
     stored_file = _get_file_or_404(db, file_id)
     _require_owner(current_user, stored_file)
     stored_file.shares.clear()
@@ -329,7 +335,10 @@ def delete_file(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
     storage: Annotated[LocalFileStorage, Depends(get_storage)],
+    settings: Annotated[Settings, get_settings]
 ) -> Response:
+    _require_allowed_user(current_user, settings)
+
     stored_file = _get_file_or_404(db, file_id)
     _require_owner(current_user, stored_file)
     storage_path = stored_file.storage_path
