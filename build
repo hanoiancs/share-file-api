@@ -27,8 +27,8 @@ fi
 
 echo "Starting container: ${CONTAINER_NAME}"
 docker run -d \
-  --add-host=host.docker.internal:host-gateway \
   --name "${CONTAINER_NAME}" \
+  --network localapp \
   --mount type=bind,source="$(pwd)/statics",target=/app/statics \
   -p "${HOST_PORT}:${CONTAINER_PORT}" \
   "${IMAGE_NAME}"
