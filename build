@@ -27,7 +27,6 @@ fi
 
 echo "Starting container: ${CONTAINER_NAME}"
 docker run -d \
-  -u "$(id -u):$(id -g)" \
   --name "${CONTAINER_NAME}" \
   --network localapp \
   --mount type=bind,source="$(pwd)/statics",target=/app/statics \
