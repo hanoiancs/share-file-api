@@ -1,11 +1,11 @@
 from pathlib import Path
 
-from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine, inspect
 
-from internal_static_files.database import metadata
-from internal_static_files.migrations import get_alembic_database_url, target_metadata
+from alembic import command
+from app.database import metadata
+from app.migrations import get_alembic_database_url, target_metadata
 
 
 def test_alembic_uses_sqlmodel_metadata() -> None:
@@ -21,7 +21,10 @@ def test_alembic_database_url_loads_from_env_file(tmp_path: Path, monkeypatch) -
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("DATABASE_URL", raising=False)
 
-    assert get_alembic_database_url() == "postgresql+psycopg://user:pass@localhost:5432/from_env"
+    assert (
+        get_alembic_database_url()
+        == "postgresql+psycopg://user:pass@localhost:5432/from_env"
+    )
 
 
 def test_alembic_ini_points_to_env_py() -> None:
@@ -30,7 +33,9 @@ def test_alembic_ini_points_to_env_py() -> None:
     assert config.get_main_option("script_location") == "alembic"
 
 
-def test_alembic_upgrade_head_creates_current_schema(tmp_path: Path, monkeypatch) -> None:
+def test_alembic_upgrade_head_creates_current_schema(
+    tmp_path: Path, monkeypatch
+) -> None:
     database_path = tmp_path / "app.db"
     env_file = tmp_path / ".env"
     env_file.write_text(
@@ -46,4 +51,6 @@ def test_alembic_upgrade_head_creates_current_schema(tmp_path: Path, monkeypatch
     command.upgrade(config, "head")
 
     inspector = inspect(create_engine(f"sqlite+pysqlite:///{database_path}"))
-    assert {"users", "user_auths", "files", "file_shares"}.issubset(inspector.get_table_names())
+    assert {"users", "user_auths", "files", "file_shares"}.issubset(
+        inspector.get_table_names()
+    )

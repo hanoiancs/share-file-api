@@ -1,7 +1,7 @@
 from sqlmodel import SQLModel
 
-from internal_static_files.database import metadata
-from internal_static_files.models import FileShare, StoredFile, User, UserAuth
+from app.database import metadata
+from app.models import FileShare, StoredFile, User, UserAuth
 
 
 def test_database_metadata_comes_from_sqlmodel() -> None:

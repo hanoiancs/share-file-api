@@ -1,19 +1,20 @@
 from datetime import datetime
+from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from internal_static_files.models import ShareMode
+from app.models import ShareMode
 
 
 class FileOwnerResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
 
     id: int
     display_name: str | None
 
 
 class FileShareResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
 
     id: int
     file_id: int
@@ -21,7 +22,7 @@ class FileShareResponse(BaseModel):
 
 
 class FileMetadataResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
 
     id: int
     owner_id: int

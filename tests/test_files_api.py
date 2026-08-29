@@ -4,10 +4,12 @@ from urllib.parse import parse_qs, urlparse
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
-from internal_static_files.models import FileShare, ShareMode, StoredFile, User
+from app.models import FileShare, ShareMode, StoredFile, User
 
 
-def test_get_file_content_redirects_missing_login_to_login_route(client: TestClient) -> None:
+def test_get_file_content_redirects_missing_login_to_login_route(
+    client: TestClient,
+) -> None:
     response = client.get("/files/123/content", follow_redirects=False)
 
     assert response.status_code in {302, 307}
@@ -18,7 +20,9 @@ def test_get_file_content_redirects_missing_login_to_login_route(client: TestCli
     ]
 
 
-def test_upload_html_and_read_raw_content(client: TestClient, auth_headers: dict[str, str]) -> None:
+def test_upload_html_and_read_raw_content(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
     response = client.post(
         "/files",
         headers=auth_headers,
@@ -35,7 +39,9 @@ def test_upload_html_and_read_raw_content(client: TestClient, auth_headers: dict
     assert content.headers["content-type"].startswith("text/html")
 
 
-def test_upload_markdown_and_read_rendered_content(client: TestClient, auth_headers: dict[str, str]) -> None:
+def test_upload_markdown_and_read_rendered_content(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
     response = client.post(
         "/files",
         headers=auth_headers,
@@ -45,7 +51,9 @@ def test_upload_markdown_and_read_rendered_content(client: TestClient, auth_head
 
     assert response.status_code == 201
 
-    content = client.get(f"/files/{response.json()['id']}/content", headers=auth_headers)
+    content = client.get(
+        f"/files/{response.json()['id']}/content", headers=auth_headers
+    )
     assert content.status_code == 200
     assert content.text.strip() == "<h1>Notes</h1>"
 
@@ -149,7 +157,9 @@ def test_list_files_includes_owner_and_shares(
     ]
 
 
-def test_upload_rejects_unsupported_extension(client: TestClient, auth_headers: dict[str, str]) -> None:
+def test_upload_rejects_unsupported_extension(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
     response = client.post(
         "/files",
         headers=auth_headers,
@@ -160,7 +170,9 @@ def test_upload_rejects_unsupported_extension(client: TestClient, auth_headers: 
     assert response.status_code == 400
 
 
-def test_upload_rejects_oversized_file(client: TestClient, auth_headers: dict[str, str]) -> None:
+def test_upload_rejects_oversized_file(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
     response = client.post(
         "/files",
         headers=auth_headers,

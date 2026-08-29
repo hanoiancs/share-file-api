@@ -3,9 +3,9 @@ import pytest
 from sqlmodel import Session, select
 from urllib.parse import parse_qs, urlparse
 
-from internal_static_files.config import Settings
-from internal_static_files.auth import decode_oauth_state, fetch_google_identity
-from internal_static_files.models import User, UserAuth
+from app.config import Settings
+from app.auth import decode_oauth_state, fetch_google_identity
+from app.models import User, UserAuth
 
 
 def test_me_requires_bearer_token(client: TestClient) -> None:

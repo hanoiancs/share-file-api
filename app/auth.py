@@ -9,10 +9,9 @@ from fastapi.responses import RedirectResponse, Response
 from fastapi.security import OAuth2PasswordBearer
 from sqlmodel import Session, select
 
-from internal_static_files.config import Settings, get_settings
-from internal_static_files.database import get_db
-from internal_static_files.models import User, UserAuth, normalize_email, split_email_domain, utc_now
-
+from app.config import Settings, get_settings
+from app.database import get_db
+from app.models import User, UserAuth, normalize_email, split_email_domain, utc_now
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/google/callback", auto_error=False)
 router = APIRouter()
@@ -26,15 +25,21 @@ def create_access_token(user: User, settings: Settings) -> str:
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(minutes=settings.jwt_expires_minutes)).timestamp()),
     }
-    return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+    return jwt.encode(
+        payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm
+    )
 
 
 def decode_access_token(token: str, settings: Settings) -> int:
     try:
-        payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+        payload = jwt.decode(
+            token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm]
+        )
         return int(payload["sub"])
     except (jwt.PyJWTError, KeyError, ValueError) as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid token") from exc
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid token"
+        ) from exc
 
 
 def encode_oauth_state(handle_url: str, settings: Settings) -> str:
@@ -43,7 +48,9 @@ def encode_oauth_state(handle_url: str, settings: Settings) -> str:
         "aud": OAUTH_STATE_AUDIENCE,
         "iat": int(datetime.now(UTC).timestamp()),
     }
-    return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+    return jwt.encode(
+        payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm
+    )
 
 
 def decode_oauth_state(state: str, settings: Settings | None = None) -> str:
@@ -57,13 +64,19 @@ def decode_oauth_state(state: str, settings: Settings | None = None) -> str:
         )
         handle_url = payload["handle_url"]
     except (jwt.PyJWTError, KeyError) as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid oauth state") from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="invalid oauth state"
+        ) from exc
     if not isinstance(handle_url, str) or not handle_url:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid oauth state")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="invalid oauth state"
+        )
     return handle_url
 
 
-def set_access_token_cookie(response: Response, access_token: str, settings: Settings) -> None:
+def set_access_token_cookie(
+    response: Response, access_token: str, settings: Settings
+) -> None:
     response.set_cookie(
         "access_token",
         access_token,
@@ -74,7 +87,9 @@ def set_access_token_cookie(response: Response, access_token: str, settings: Set
     )
 
 
-def redirect_with_access_token_cookie(url: str, access_token: str, settings: Settings) -> RedirectResponse:
+def redirect_with_access_token_cookie(
+    url: str, access_token: str, settings: Settings
+) -> RedirectResponse:
     response = RedirectResponse(url)
     set_access_token_cookie(response, access_token, settings)
     return response
@@ -84,7 +99,9 @@ def append_access_token(url: str, access_token: str) -> str:
     parts = urlsplit(url)
     query = parse_qsl(parts.query, keep_blank_values=True)
     query.append(("access_token", access_token))
-    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
+    return urlunsplit(
+        (parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment)
+    )
 
 
 def get_current_user(
@@ -95,14 +112,20 @@ def get_current_user(
 ) -> User:
     token = bearer_token or access_token
     if token is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="missing token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="missing token"
+        )
     user_id = decode_access_token(token, settings)
     user = db.get(User, user_id)
     if user is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="user not found")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="user not found"
+        )
 
     if len(settings.allowed_users) > 0 and user.email not in settings.allowed_users:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="user not allowed")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="user not allowed"
+        )
 
     return user
 
@@ -118,7 +141,10 @@ def upsert_google_user(db: Session, identity: dict[str, Any]) -> User:
     if auth is not None:
         user = db.get(User, auth.user_id)
         if user is None:
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="orphaned user auth")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="orphaned user auth",
+            )
     else:
         user = db.exec(select(User).where(User.email == email)).first()
     if user is None:
@@ -152,7 +178,10 @@ async def fetch_google_identity(_code: str) -> dict[str, Any]:
         response.raise_for_status()
         return response.json()
     except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Google identity fetch failed") from exc
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Google identity fetch failed",
+        ) from exc
 
 
 @router.get("/auth/google/login", name="auth_google_login")
@@ -185,8 +214,14 @@ async def google_callback(
     identity = await fetch_google_identity(code)
     user = upsert_google_user(db, identity)
     access_token = create_access_token(user, settings)
-    handle_url = decode_oauth_state(state, settings) if state else settings.client_default_redirect_url
-    return redirect_with_access_token_cookie(append_access_token(handle_url, access_token), access_token, settings)
+    handle_url = (
+        decode_oauth_state(state, settings)
+        if state
+        else settings.client_default_redirect_url
+    )
+    return redirect_with_access_token_cookie(
+        append_access_token(handle_url, access_token), access_token, settings
+    )
 
 
 @router.get("/me")

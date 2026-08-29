@@ -6,11 +6,19 @@ from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, create_engine
 
-from internal_static_files.app import create_app
-from internal_static_files.auth import create_access_token
-from internal_static_files.config import Settings, get_settings
-from internal_static_files.database import Base, get_db
-from internal_static_files.models import FileShare, ShareMode, StoredFile, User, UserAuth, normalize_email, split_email_domain
+from app.app import create_app
+from app.auth import create_access_token
+from app.config import Settings, get_settings
+from app.database import Base, get_db
+from app.models import (
+    FileShare,
+    ShareMode,
+    StoredFile,
+    User,
+    UserAuth,
+    normalize_email,
+    split_email_domain,
+)
 
 
 @pytest.fixture()
@@ -113,7 +121,9 @@ def file_factory(db_session: Session) -> Callable[..., StoredFile]:
 @pytest.fixture()
 def share_factory(db_session: Session) -> Callable[[StoredFile, str], FileShare]:
     def factory(stored_file: StoredFile, email: str) -> FileShare:
-        share = FileShare(file_id=stored_file.id, recipient_email=normalize_email(email))
+        share = FileShare(
+            file_id=stored_file.id, recipient_email=normalize_email(email)
+        )
         db_session.add(share)
         db_session.commit()
         db_session.refresh(share)
@@ -123,7 +133,9 @@ def share_factory(db_session: Session) -> Callable[[StoredFile, str], FileShare]
 
 
 @pytest.fixture()
-def token_for_email(settings: Settings, user_factory: Callable[..., User]) -> Callable[[str], str]:
+def token_for_email(
+    settings: Settings, user_factory: Callable[..., User]
+) -> Callable[[str], str]:
     def factory(email: str) -> str:
         user = user_factory(email=email)
         return create_access_token(user, settings)

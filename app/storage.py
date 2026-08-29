@@ -24,8 +24,8 @@ class StoredUpload:
 
 class LocalFileStorage:
     def __init__(self, root: Path, max_upload_bytes: int) -> None:
-        self.root = Path(root)
-        self.max_upload_bytes = max_upload_bytes
+        self.root: Path = Path(root)
+        self.max_upload_bytes: int = max_upload_bytes
 
     def write_upload(
         self, user_id: int, original_filename: str, content: bytes
@@ -33,9 +33,11 @@ class LocalFileStorage:
         content_type, suffix = self._classify(original_filename)
         self._validate_size(content)
         relative_path = str(Path(str(user_id)) / f"{uuid4().hex}{suffix}")
+
         absolute_path = self.root / relative_path
         absolute_path.parent.mkdir(parents=True, exist_ok=True)
-        absolute_path.write_bytes(content)
+        _ = absolute_path.write_bytes(content)
+
         return StoredUpload(
             relative_path=relative_path,
             content_type=content_type,

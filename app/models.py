@@ -32,7 +32,7 @@ def split_email_domain(email: str) -> str:
 
 
 class User(SQLModel, table=True):
-    __tablename__ = "users"
+    __tablename__ = "users"  # type: ignore
 
     id: int | None = Field(default=None, primary_key=True)
     email: str = Field(index=True, unique=True, max_length=320)
@@ -45,7 +45,9 @@ class User(SQLModel, table=True):
     )
     updated_at: datetime = Field(
         default_factory=utc_now,
-        sa_column=Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False),
+        sa_column=Column(
+            DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+        ),
     )
     last_login_at: datetime | None = Field(
         default=None,
@@ -63,7 +65,7 @@ class User(SQLModel, table=True):
 
 
 class UserAuth(SQLModel, table=True):
-    __tablename__ = "user_auths"
+    __tablename__: str = "user_auths"
 
     user_id: int = Field(foreign_key="users.id", primary_key=True)
     oauth_provider: str = Field(primary_key=True, max_length=64)
@@ -73,7 +75,7 @@ class UserAuth(SQLModel, table=True):
 
 
 class StoredFile(SQLModel, table=True):
-    __tablename__ = "files"
+    __tablename__: str = "files"
 
     id: int | None = Field(default=None, primary_key=True)
     owner_id: int = Field(foreign_key="users.id", index=True)
@@ -93,7 +95,9 @@ class StoredFile(SQLModel, table=True):
     )
     updated_at: datetime = Field(
         default_factory=utc_now,
-        sa_column=Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False),
+        sa_column=Column(
+            DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+        ),
     )
 
     owner: User = Relationship(back_populates="files")
@@ -104,7 +108,7 @@ class StoredFile(SQLModel, table=True):
 
 
 class FileShare(SQLModel, table=True):
-    __tablename__ = "file_shares"
+    __tablename__: str = "file_shares"
     __table_args__ = (UniqueConstraint("file_id", "recipient_email"),)
 
     id: int | None = Field(default=None, primary_key=True)

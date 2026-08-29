@@ -1,6 +1,5 @@
 from math import ceil
 from typing import Annotated
-from urllib.parse import urlencode
 
 from fastapi import (
     APIRouter,
@@ -16,44 +15,40 @@ from fastapi import (
 )
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
-
 from sqlalchemy import delete, func, or_
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 
-from internal_static_files.auth import (
+from app.auth import (
     decode_access_token,
     get_current_user,
     oauth2_scheme,
 )
-from internal_static_files.config import Settings, get_settings
-from internal_static_files.database import get_db
-from internal_static_files.markdown import render_markdown
-from internal_static_files.models import (
+from app.config import Settings, get_settings
+from app.database import get_db
+from app.markdown import render_markdown
+from app.models import (
     FileShare,
     ShareMode,
     StoredFile,
     User,
     normalize_email,
 )
-from internal_static_files.schemas import (
+from app.schemas import (
     FileMetadataResponse,
     FileUpdateRequest,
     PaginatedFilesResponse,
     ShareListRequest,
     ShareListResponse,
 )
-from internal_static_files.sharing import can_read_file
-from internal_static_files.storage import (
+from app.sharing import can_read_file
+from app.storage import (
     LocalFileStorage,
     UnsupportedFileTypeError,
     UploadTooLargeError,
 )
 
-
-router = APIRouter(
-    prefix="/files", tags=["files"]
-)
+router = APIRouter(prefix="/files", tags=["files"])
 
 templates = Jinja2Templates(directory="templates")
 templates.env.autoescape = False

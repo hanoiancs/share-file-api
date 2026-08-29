@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from internal_static_files.markdown import render_markdown
-from internal_static_files.storage import LocalFileStorage, UnsupportedFileTypeError, UploadTooLargeError
+from app.markdown import render_markdown
+from app.storage import LocalFileStorage, UnsupportedFileTypeError, UploadTooLargeError
 
 
 def test_storage_writes_generated_path_and_preserves_content(tmp_path: Path) -> None:

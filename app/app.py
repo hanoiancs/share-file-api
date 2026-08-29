@@ -1,18 +1,22 @@
-from typing import Any
-from typing import Annotated
 from urllib.parse import urlencode, urlsplit, urlunsplit
 
-from fastapi import FastAPI, Depends, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 
-from internal_static_files import models as _models
-from internal_static_files.auth import router as auth_router, set_access_token_cookie
-from internal_static_files.config import Settings, get_settings
-from internal_static_files.database import Base
-from internal_static_files.files import router as files_router
+from app import models as _models
+from app.auth import router as auth_router
+from app.auth import set_access_token_cookie
+from app.config import get_settings
+from app.database import Base
+from app.files import router as files_router
 
 _ = _models
+
+ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173"
+]
 
 
 def create_app() -> FastAPI:
@@ -20,10 +24,10 @@ def create_app() -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=ORIGINS,
+        allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
-        allow_credentials=False,
     )
 
     @app.get("/health")

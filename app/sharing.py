@@ -1,4 +1,4 @@
-from internal_static_files.models import ShareMode, StoredFile, User, normalize_email
+from app.models import ShareMode, StoredFile, User, normalize_email
 
 
 def can_read_file(requester: User, stored_file: StoredFile) -> bool:

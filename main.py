@@ -1,7 +1,7 @@
-from internal_static_files.app import create_app
-
+from app.app import create_app
 
 app = create_app()
+app.frontend("/", directory="dist")
 
 
 def main():

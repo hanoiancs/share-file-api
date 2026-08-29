@@ -11,7 +11,7 @@ wheels/
 
 # Local credentials
 .env
-.env.*
-credentials.json
+.env.dev
+.env.prod
 
-statics
+credentials.json
