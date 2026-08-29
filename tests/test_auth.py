@@ -111,6 +111,23 @@ def test_me_accepts_access_token_cookie(client: TestClient, user_token: str) -> 
     assert response.json()["email"] == "alice@example.com"
 
 
+def test_logout_deletes_access_token_cookie(
+    client: TestClient, user_token: str
+) -> None:
+    client.cookies.set("access_token", user_token)
+    assert client.get("/me").status_code == 200
+
+    response = client.post("/auth/logout")
+
+    assert response.status_code == 204
+    set_cookie = response.headers["set-cookie"]
+    assert set_cookie.startswith("access_token=")
+    assert "Max-Age=0" in set_cookie
+
+    client.cookies.pop("access_token", None)
+    assert client.get("/me").status_code == 401
+
+
 def test_access_token_query_is_saved_to_cookie_globally(
     client: TestClient, user_token: str
 ) -> None:

@@ -87,6 +87,15 @@ def set_access_token_cookie(
     )
 
 
+def clear_access_token_cookie(response: Response) -> None:
+    response.delete_cookie(
+        "access_token",
+        httponly=True,
+        secure=False,
+        samesite="lax",
+    )
+
+
 def redirect_with_access_token_cookie(
     url: str, access_token: str, settings: Settings
 ) -> RedirectResponse:
@@ -222,6 +231,13 @@ async def google_callback(
     return redirect_with_access_token_cookie(
         append_access_token(handle_url, access_token), access_token, settings
     )
+
+
+@router.post("/auth/logout")
+def logout() -> Response:
+    response = Response(status_code=status.HTTP_204_NO_CONTENT)
+    clear_access_token_cookie(response)
+    return response
 
 
 @router.get("/me")

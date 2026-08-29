@@ -15,7 +15,7 @@ from fastapi import (
 )
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import delete, func, or_
+from sqlalchemy import delete, func
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 
@@ -164,7 +164,7 @@ def list_files(
         .where(visibility_filter)
         .options(selectinload(StoredFile.owner), selectinload(StoredFile.shares))
         .distinct()
-        .order_by(StoredFile.id)
+        .order_by(StoredFile.id.desc())
         .offset(offset)
         .limit(per_page)
     ).all()
